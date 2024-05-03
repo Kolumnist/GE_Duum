@@ -21,20 +21,28 @@ public class CharacterInputHandler : MonoBehaviour
     private string lookName = "Look";
     [SerializeField]
     private string sprintName = "Sprint";
-    [SerializeField]
+	[SerializeField] 
+    private string dashName = "Dash";
+	[SerializeField]
     private string jumpName = "Jump";
+    [SerializeField]
+	private string grapplingHookName = "Grappling Hook";
 
-    private InputAction moveAction;
+	private InputAction moveAction;
     private InputAction lookAction;
     private InputAction sprintAction;
-    private InputAction jumpAction;
+    private InputAction dashAction;
+	private InputAction jumpAction;
+    private InputAction grapplingHookAction;
 
-    public Vector2 MoveInput { get; private set; }
-    public Vector2 LookInput { get; private set; }
-    public float SprintValue { get; private set; }
-    public bool JumpTriggered { get; private set; }
+	public static Vector2 MoveInput { get; private set; }
+    public static Vector2 LookInput { get; private set; }
+    public static float SprintValue { get; private set; }
+    public static bool JumpTriggered { get; private set; }
+    public static bool DashTriggered { get; set; }
+    public static bool GrapplingHookTriggered { get; set; }
 
-    public static CharacterInputHandler Instance { get; private set; }
+	public static CharacterInputHandler Instance { get; private set; }
 
 
     // Start is called before the first frame update
@@ -50,11 +58,14 @@ public class CharacterInputHandler : MonoBehaviour
             Destroy(gameObject);
         }
 
-        moveAction = characterControls.FindActionMap(actionMapName).FindAction(moveName);
-        lookAction = characterControls.FindActionMap(actionMapName).FindAction(lookName);
-        sprintAction = characterControls.FindActionMap(actionMapName).FindAction(sprintName);
-        jumpAction = characterControls.FindActionMap(actionMapName).FindAction(jumpName);
-        RegisterInputActions();
+        InputActionMap inputs = characterControls.FindActionMap(actionMapName);
+		moveAction = inputs.FindAction(moveName);
+        lookAction = inputs.FindAction(lookName);
+        sprintAction = inputs.FindAction(sprintName);
+        dashAction = inputs.FindAction(dashName);
+        jumpAction = inputs.FindAction(jumpName);
+		grapplingHookAction = inputs.FindAction(grapplingHookName);
+		RegisterInputActions();
     }
 
     private void RegisterInputActions()
@@ -70,23 +81,33 @@ public class CharacterInputHandler : MonoBehaviour
 
         jumpAction.performed += context => JumpTriggered = true;
         jumpAction.canceled += context => JumpTriggered = false;
-    }
 
-    private void OnEnable()
+		dashAction.started += context => DashTriggered = true;
+		dashAction.canceled += context => DashTriggered = false;
+
+        grapplingHookAction.started += context => GrapplingHookTriggered = true;
+        grapplingHookAction.canceled += context => GrapplingHookTriggered = false;
+	}
+
+	private void OnEnable()
     {
         moveAction.Enable();
         lookAction.Enable();
         sprintAction.Enable();
-        jumpAction.Enable();
-    }
+		dashAction.Enable();
+		jumpAction.Enable();
+		grapplingHookAction.Enable();
+	}
 
     private void OnDisable()
     {
         moveAction.Disable();
         lookAction.Disable();
         sprintAction.Disable();
-        jumpAction.Disable();
-    }
+		dashAction.Disable();
+		jumpAction.Disable();
+		grapplingHookAction.Disable();
+	}
 
 #if DEBUG
     private void PrintDevices()
