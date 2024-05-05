@@ -25,9 +25,8 @@ public class CharacterControl : MonoBehaviour
 	private float velocity = 0f;
 	private float verticalRotation = 0f;
 	private float dashCooldownLeft = 0f;
+	private bool isGettingKnockedBack = false;
 
-	private float doubleJumpDelay = 0f;
-	
 	// Character stats
 	public float jumpForce;
 
@@ -73,7 +72,7 @@ public class CharacterControl : MonoBehaviour
 		worldDirection.Normalize();
 
 		var normalSpeed = movement.speed;
-		
+
 		if (movement.isSprinting)
 		{
 			normalSpeed = movement.speed * movement.sprintMultiplier;
@@ -83,20 +82,14 @@ public class CharacterControl : MonoBehaviour
 		currentMovement.x = worldDirection.x * movement.currentSpeed;
 		currentMovement.z = worldDirection.z * movement.currentSpeed;
 
-		if (GetComponent<WallJump>().isWallJumping)
-		{
-			currentMovement.y += jumpForce/2;
-			currentMovement.z *= jumpForce/10;
-			currentMovement.x *= jumpForce/10;
-		}
-
 		if (movement.isDashing)
 		{
-			currentMovement.x *= movement.sprintMultiplier;
-			currentMovement.y = 0;
-			currentMovement.z *= movement.sprintMultiplier;
+			currentMovement.x *= movement.dashMultiplier / movement.currentSpeed;
+			currentMovement.y = 0.2f;
+			velocity = 0;
+			currentMovement.z *= movement.dashMultiplier / movement.currentSpeed;
 		}
-
+		Debug.Log(currentMovement);
 		characterController.Move(currentMovement * Time.deltaTime);
 	}
 
@@ -127,7 +120,7 @@ public class CharacterControl : MonoBehaviour
 		float displacementY = endPoint.y - startPoint.y;
 		Vector3 displacementXZ = new(endPoint.x - startPoint.x, 0f, endPoint.z - startPoint.z);
 
-		Vector3 velocityY = Vector3.up * Mathf.Sqrt(-2 * gravity * trajectoryHeight) * 0.5f;
+		Vector3 velocityY = Vector3.up * Mathf.Sqrt(-2 * gravity * trajectoryHeight) * 0.25f;
 		Vector3 velocityXZ = displacementXZ / (Mathf.Sqrt(-2 * trajectoryHeight / gravity)
 			+ Mathf.Sqrt(2 * (displacementY - trajectoryHeight) / gravity));
 
@@ -145,14 +138,19 @@ public class CharacterControl : MonoBehaviour
 	}
 	public void Jump(InputAction.CallbackContext context)
 	{
-		if (!context.started) return;
+		if (GetComponent<WallJump>().holdsOntoWall) jumps = 1;
+		if (!context.started || isGettingKnockedBack) return;
 		if (!IsGrounded() && jumps <= 0) return;
 
 		if (jumps == maxJumps) StartCoroutine(WaitForLanding());
-
-		if (velocity < 0) velocity = 0;
-		velocity += jumpForce;
 		jumps--;
+
+		DoJump();
+	}
+	public void DoJump()
+	{
+		if (velocity < 0 || velocity > (jumpForce / 2)) velocity = 0;
+		velocity += jumpForce;
 	}
 
 	public void Sprint(InputAction.CallbackContext context)
@@ -178,12 +176,24 @@ public class CharacterControl : MonoBehaviour
 		StartCoroutine(WaitForDashToEnd());
 	}
 
+	private IEnumerator WaitForKnockbackToEnd(float duration)
+	{
+		yield return new WaitForSecondsRealtime(duration);
+		isGettingKnockedBack = false;
+	}
+	public void Knockback(float knockbackStrength, float knockbackDuration)
+	{
+		isGettingKnockedBack = true;
+		velocity += knockbackStrength;
+		StartCoroutine(WaitForKnockbackToEnd(knockbackDuration));
+	}
 }
 
 [Serializable]
 public struct Movement
 {
 	public float speed;
+	public float wallClimbSpeed;
 	public float sprintMultiplier;
 	public float dashMultiplier;
 	public float dashDuration;

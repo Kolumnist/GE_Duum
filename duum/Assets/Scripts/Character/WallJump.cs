@@ -6,31 +6,19 @@ using UnityEngine.InputSystem;
 public class WallJump : MonoBehaviour
 {
 	[SerializeField]
+	private LayerMask whatIsWall;
+
 	private CharacterController characterController;
-
-	public LayerMask whatIsWall;
-	public LayerMask whatIsGround;
-
-	public float wallJumpUpForce;
-	public float wallJumpSideForce;
-
-	public float rayWallCheckDistance;
-	public float minJumpHeight;
-	private RaycastHit leftWallhit;
-	private RaycastHit rightWallhit;
-	private RaycastHit forwardWallhit;
-	private RaycastHit backwardWallhit;
 
 	private bool wallLeft;
 	private bool wallRight;
 	private bool wallForward;
 	private bool wallBackward;
 
+	public float rayWallCheckDistance;
 	public bool isWallJumping;
+	public float climbSpeed;
 	public bool holdsOntoWall;
-
-	private readonly float exitWallTime = 0.25f;
-	private float exitWallTimer;
 
 	// Start is called before the first frame update
 	void Start()
@@ -38,66 +26,49 @@ public class WallJump : MonoBehaviour
 		characterController = GetComponent<CharacterController>();
 	}
 
+	private void FixedUpdate()
+	{
+		if (holdsOntoWall)
+		{
+			var normalized = CharacterInputHandler.MoveInput.normalized;
+			if (normalized.y == 0) return; 
+			characterController.Move(new Vector3(0, climbSpeed * normalized.y, 0) * Time.deltaTime);
+			
+			if (wallLeft || wallRight || wallForward || wallBackward)
+			{
+				return;
+			}
+			holdsOntoWall = false;
+			GetComponent<CharacterControl>().DoJump();
+		}
+	}
+
 	// Update is called once per frame
 	void Update()
 	{
-	}
-
-	Vector3 wallNormal;
-	private void WallJumpMove()
-	{
-		if(wallLeft)
-		{
-			wallNormal = leftWallhit.normal;
-		}
-		else if (wallRight) 
-		{ 
-			wallNormal = rightWallhit.normal;
-		}
-		else if (wallForward)
-		{
-			wallNormal = forwardWallhit.normal;
-		}
-		else if (wallBackward)
-		{
-			wallNormal = backwardWallhit.normal;
-		}
-
-		Vector3 forceToApply = transform.up * wallJumpUpForce + wallNormal * wallJumpSideForce;
+		CheckForWall();
 	}
 
 	private void CheckForWall()
 	{
-		wallRight = Physics.Raycast(transform.position, characterController.gameObject.transform.right, out rightWallhit, rayWallCheckDistance, whatIsWall);
-		wallLeft = Physics.Raycast(transform.position, -characterController.gameObject.transform.right, out leftWallhit, rayWallCheckDistance, whatIsWall);
-		wallForward = Physics.Raycast(transform.position, characterController.gameObject.transform.forward, out forwardWallhit, rayWallCheckDistance, whatIsWall);
-		wallBackward = Physics.Raycast(transform.position, -characterController.gameObject.transform.forward, out backwardWallhit, rayWallCheckDistance, whatIsWall);
-	}
-
-	private bool AboveGround()
-	{
-		return !Physics.Raycast(transform.position, Vector3.down, minJumpHeight, whatIsGround);
+		wallRight = Physics.Raycast(transform.position, characterController.gameObject.transform.right, rayWallCheckDistance, whatIsWall);
+		wallLeft = Physics.Raycast(transform.position, -characterController.gameObject.transform.right, rayWallCheckDistance, whatIsWall);
+		wallForward = Physics.Raycast(transform.position, characterController.gameObject.transform.forward, rayWallCheckDistance, whatIsWall);
+		wallBackward = Physics.Raycast(transform.position, -characterController.gameObject.transform.forward, rayWallCheckDistance, whatIsWall);
 	}
 
 	public void Jump(InputAction.CallbackContext context)
 	{
-		if ((wallLeft || wallRight || wallForward || wallBackward) && !characterController.isGrounded)
+		if (context.performed && 
+			(wallLeft || wallRight || wallForward || wallBackward) && 
+			!characterController.isGrounded)
 		{
-			holdsOntoWall = context.started || context.performed;
+			holdsOntoWall = true;
 		}
-		
-		if (!holdsOntoWall)
+		else if (context.canceled && holdsOntoWall)
 		{
 			holdsOntoWall = false;
-			isWallJumping = true;
-			exitWallTimer = exitWallTime;
-			//WallJumpMove();
-			Invoke(nameof(EndOfWallJump), exitWallTime);
+			GetComponent<CharacterControl>().DoJump();
 		}
-	}
-
-	private void EndOfWallJump()
-	{
-		isWallJumping = false;
 	}
 }
