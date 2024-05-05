@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class GrapplingHook : MonoBehaviour
 {
@@ -9,31 +11,36 @@ public class GrapplingHook : MonoBehaviour
 	[SerializeField]
 	private Transform gunTip;
 	[SerializeField]
+	private LayerMask isGrappingHookApproved;
+	[SerializeField]
 	private LineRenderer lineRenderer;
 
 	private Vector3 grapplePoint = Vector3.zero;
 
 	private bool isGrappling = false;
 	private float grapplingCdTimer = 0f;
-	public float grapplingCd;
-	public float grappleDistance;
-	public float overshootYAxis;
-	public float grappleDelayTime;
 
-	public static bool freeze = false;
+	public float grappleForce;
+	public float grappleDistance;
+	public float grappleCooldown;
+	public float grappleDuration;
+	public float overshootYAxis;
+
+	private void Start()
+	{
+		lineRenderer.enabled = false;
+	}
 
 	private void Update()
 	{
-		if (CharacterInputHandler.GrapplingHookTriggered)
+		if (isGrappling)
 		{
-			StartGrapple();
-		}
-		else if (isGrappling && !freeze)
-		{
-			Vector3 lowestPoint = new Vector3(transform.position.x, transform.position.y - 1f, transform.position.z);
+			Vector3 lowestPoint = new(transform.position.x, transform.position.y, transform.position.z);
 			float grapplePointRelativeYPos = grapplePoint.y - lowestPoint.y;
 			float highestPointOnArc = grapplePointRelativeYPos + overshootYAxis;
-			GetComponentInParent<CharacterControl>().JumpToPosition(grapplePoint, highestPointOnArc);
+			if (grapplePointRelativeYPos < 0) highestPointOnArc = overshootYAxis;
+
+			GetComponentInParent<CharacterControl>().PullToPosition(grapplePoint, grappleForce, highestPointOnArc);
 		}
 
 		if (grapplingCdTimer > 0)
@@ -44,55 +51,39 @@ public class GrapplingHook : MonoBehaviour
 
 	private void LateUpdate()
 	{
-		if (isGrappling)
+		if (lineRenderer.enabled)
 		{
 			lineRenderer.SetPosition(0, gunTip.position);
 		}
 	}
 
-	private void StartGrapple()
+	public void Grapple(InputAction.CallbackContext context)
 	{
-		if (grapplingCdTimer > 0) return;
-		LayerMask layerMask = LayerMask.GetMask("Default");
-		isGrappling = true;
-		freeze = false;
+		if (!context.started) return;
+		if (isGrappling || grapplingCdTimer > 0) return;
 
-		if (Physics.Raycast(gunTip.position, cam.transform.forward, out RaycastHit hit, grappleDistance, layerMask))
+
+		if (Physics.Raycast(gunTip.position, cam.transform.forward, out RaycastHit hit, grappleDistance, isGrappingHookApproved))
 		{
-			lineRenderer.enabled = true;
 			grapplePoint = hit.point;
-			Invoke(nameof(ExecuteGrappling), grappleDelayTime);
-			CharacterInputHandler.GrapplingHookTriggered = false;
+			isGrappling = context.started;
 		}
 		else
 		{
 			grapplePoint = gunTip.position + cam.forward * grappleDistance;
-			Invoke(nameof(EndGrappling), grappleDelayTime);
 		}
+
 		lineRenderer.enabled = true;
 		lineRenderer.SetPosition(1, grapplePoint);
+		grapplingCdTimer = grappleCooldown;
+		StartCoroutine(EndGrappling());
 	}
 
-	private void ExecuteGrappling()
+	private IEnumerator EndGrappling()
 	{
-		freeze = false;
-
-		Vector3 lowestPoint = new Vector3(transform.position.x, transform.position.y - 1f, transform.position.z);
-		float grapplePointRelativeYPos = grapplePoint.y - lowestPoint.y;
-		float highestPointOnArc = grapplePointRelativeYPos + overshootYAxis;
-
-		if (grapplePointRelativeYPos < 0) highestPointOnArc = overshootYAxis;
-
-		GetComponentInParent<CharacterControl>().JumpToPosition(grapplePoint, highestPointOnArc);
-
-		Invoke(nameof(EndGrappling), 0.5f);
-	}
-
-	private void EndGrappling()
-	{
-		freeze = false;
+		yield return new WaitForSecondsRealtime(grappleDuration);
 		isGrappling = false;
 		lineRenderer.enabled = false;
-		grapplingCdTimer = grapplingCd;
+		grapplingCdTimer = grappleCooldown;
 	}
 }

@@ -1,41 +1,46 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Net;
 using UnityEngine;
-using UnityEngine.InputSystem.XR;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.ProBuilder.MeshOperations;
 
 [RequireComponent(typeof(CharacterController))]
 public class CharacterControl : MonoBehaviour
 {
 	[SerializeField]
-	private CharacterController characterController;
-	[SerializeField]
 	private Camera cam;
 	[SerializeField]
 	private Transform gunTip;
 
+	[SerializeField]
+	private Movement movement;
+
+	private CharacterController characterController;
+	private bool IsGrounded() => characterController.isGrounded;
+
 	private Vector3 currentMovement = Vector3.zero;
-	private Vector3 moveDirection = Vector3.zero;
+	private float velocity = 0f;
 	private float verticalRotation = 0f;
+	private float dashCooldownLeft = 0f;
 
 	private float doubleJumpDelay = 0f;
-	private float dashDelay = 0f;
-
+	
 	// Character stats
-
-	public float walkSpeed = 8f;
-	public float sprintSpeed = 15f;
-	public float dashMultiplier = 10f;
-	public float jumpForce = 4f;
-	public float grappleForce = 10f;
+	public float jumpForce;
 
 	public float mouseSensitivity = 2f;
 	public float lookUpDownRange = 80f;
 
-	//
+	private float jumps = 2f;
+	public float maxJumps = 2f;
 
-	public bool canDoubleJump = true;
-	public float gravity = 9.81f;
+	//
+	[SerializeField]
+	private float gravityMultiplier;
+	private readonly float gravity = 9.81f;
 
 	// Start is called before the first frame update
 	private void Awake()
@@ -48,70 +53,51 @@ public class CharacterControl : MonoBehaviour
 	// Update is called once per frame
 	private void Update()
 	{
-		HandleMovement();
 		HandleRotation();
+		if (!GetComponent<WallJump>().holdsOntoWall)
+		{
+			ApplyGravity();
+			HandleMove();
+		}
+
+		if (dashCooldownLeft > 0)
+		{
+			dashCooldownLeft -= Time.deltaTime;
+		}
 	}
 
-	private void HandleMovement()
+	private void HandleMove()
 	{
-		float speed = CharacterInputHandler.SprintValue > 0 ? sprintSpeed : walkSpeed;
 		Vector3 inputDirection = new(CharacterInputHandler.MoveInput.x, 0f, CharacterInputHandler.MoveInput.y);
 		Vector3 worldDirection = transform.TransformDirection(inputDirection);
 		worldDirection.Normalize();
 
-		if (CharacterInputHandler.DashTriggered && Time.time > dashDelay)
+		var normalSpeed = movement.speed;
+		
+		if (movement.isSprinting)
 		{
-			HandleDashing();
-			speed *= dashMultiplier;
+			normalSpeed = movement.speed * movement.sprintMultiplier;
 		}
-		currentMovement.x = worldDirection.x * speed;
-		currentMovement.z = worldDirection.z * speed;
+		movement.currentSpeed = Mathf.MoveTowards(movement.currentSpeed, normalSpeed, movement.acceleration * Time.deltaTime);
 
-		HandleJumping();
+		currentMovement.x = worldDirection.x * movement.currentSpeed;
+		currentMovement.z = worldDirection.z * movement.currentSpeed;
+
+		if (GetComponent<WallJump>().isWallJumping)
+		{
+			currentMovement.y += jumpForce/2;
+			currentMovement.z *= jumpForce/10;
+			currentMovement.x *= jumpForce/10;
+		}
+
+		if (movement.isDashing)
+		{
+			currentMovement.x *= movement.sprintMultiplier;
+			currentMovement.y = 0;
+			currentMovement.z *= movement.sprintMultiplier;
+		}
+
 		characterController.Move(currentMovement * Time.deltaTime);
-	}
-
-	private void HandleDashing()
-	{
-		walkSpeed *= dashMultiplier;
-		sprintSpeed *= dashMultiplier;
-		Invoke(nameof(ResetSpeed), 0.05f);
-
-		dashDelay = Time.time + 2f;
-		CharacterInputHandler.DashTriggered = false;
-	}
-
-	private void ResetSpeed()
-	{
-		walkSpeed /= dashMultiplier;
-		sprintSpeed /= dashMultiplier;
-	} 
-
-	private void HandleJumping()
-	{
-		if (characterController.isGrounded)
-		{
-			currentMovement.y = -0.5f;
-			canDoubleJump = true;
-
-			if (CharacterInputHandler.JumpTriggered)
-			{
-				currentMovement.y = jumpForce;
-				doubleJumpDelay = Time.time + 0.3f;
-			}
-		}
-		else
-		{
-			currentMovement.y -= (gravity * 2) * Time.deltaTime;
-
-			if (CharacterInputHandler.JumpTriggered && canDoubleJump && Time.time > doubleJumpDelay)
-			{
-				canDoubleJump = false;
-				if (currentMovement.y < 0f) currentMovement.y = 0f;
-				currentMovement.y += jumpForce;
-			}
-		}
-
 	}
 
 	private void HandleRotation()
@@ -124,21 +110,92 @@ public class CharacterControl : MonoBehaviour
 		cam.transform.localRotation = Quaternion.Euler(verticalRotation, 0, 0);
 	}
 
-	public void JumpToPosition(Vector3 targetPosition, float trajectoryHeight)
+	private void ApplyGravity()
 	{
-		characterController.Move(CalculateJumpVelocity(transform.position, targetPosition, trajectoryHeight));
+		if (IsGrounded() && velocity < 0.0f) velocity = -0.5f; 
+		else velocity -= gravity * gravityMultiplier * Time.deltaTime;
+
+		currentMovement.y = velocity;
 	}
 
-	public Vector3 CalculateJumpVelocity(Vector3 startPoint, Vector3 endPoint, float trajectoryHeight)
+	public void PullToPosition(Vector3 targetPosition, float grappleForce, float trajectoryHeight)
 	{
+		Vector3 startPoint = transform.position;
+		Vector3 endPoint = targetPosition;
+
 		float gravity = Physics.gravity.y;
 		float displacementY = endPoint.y - startPoint.y;
-		Vector3 displacementXZ = new Vector3(endPoint.x - startPoint.x, 0f, endPoint.z - startPoint.z);
+		Vector3 displacementXZ = new(endPoint.x - startPoint.x, 0f, endPoint.z - startPoint.z);
 
-		Vector3 velocityY = Vector3.up * Mathf.Sqrt(-2 * gravity * trajectoryHeight);
+		Vector3 velocityY = Vector3.up * Mathf.Sqrt(-2 * gravity * trajectoryHeight) * 0.5f;
 		Vector3 velocityXZ = displacementXZ / (Mathf.Sqrt(-2 * trajectoryHeight / gravity)
 			+ Mathf.Sqrt(2 * (displacementY - trajectoryHeight) / gravity));
 
-		return (velocityXZ + velocityY) * grappleForce * Time.deltaTime;
+		velocity = 0;
+		characterController.Move((velocityXZ + velocityY) * grappleForce * Time.deltaTime);
 	}
+
+
+	private IEnumerator WaitForLanding()
+	{
+		yield return new WaitUntil(() => !IsGrounded());
+		yield return new WaitUntil(IsGrounded);
+
+		jumps = 2;
+	}
+	public void Jump(InputAction.CallbackContext context)
+	{
+		if (!context.started) return;
+		if (!IsGrounded() && jumps <= 0) return;
+
+		if (jumps == maxJumps) StartCoroutine(WaitForLanding());
+
+		if (velocity < 0) velocity = 0;
+		velocity += jumpForce;
+		jumps--;
+	}
+
+	public void Sprint(InputAction.CallbackContext context)
+	{
+		movement.isSprinting = context.started || context.performed;
+	}
+
+	private IEnumerator WaitForDashToEnd()
+	{
+		yield return new WaitUntil(() => movement.isDashing);
+		yield return new WaitUntil(() => dashCooldownLeft > 0);
+		yield return new WaitForSecondsRealtime(movement.dashDuration);
+
+		movement.isDashing = false;
+	}
+	public void Dash(InputAction.CallbackContext context)
+	{
+		if (!context.started) return;
+		if (dashCooldownLeft > 0) return;
+
+		movement.isDashing = context.started;
+		dashCooldownLeft = movement.dashCooldown;
+		StartCoroutine(WaitForDashToEnd());
+	}
+
+}
+
+[Serializable]
+public struct Movement
+{
+	public float speed;
+	public float sprintMultiplier;
+	public float dashMultiplier;
+	public float dashDuration;
+	public float dashCooldown;
+	public float acceleration;
+
+	[HideInInspector]
+	public bool isSprinting;
+
+	[HideInInspector]
+	public bool isDashing;
+
+	[HideInInspector]
+	public float currentSpeed;
 }

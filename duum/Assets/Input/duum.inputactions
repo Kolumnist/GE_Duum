@@ -324,10 +324,10 @@
                 {
                     "name": "",
                     "id": "9cec95cb-6988-40ee-9cf4-55aa5df8e6c9",
-                    "path": "<Mouse>/rightButton",
+                    "path": "<Keyboard>/r",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "Grappling Hook",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -345,11 +345,11 @@
                 },
                 {
                     "name": "",
-                    "id": "5406e183-a6b9-43ec-9e48-3bd505a30309",
-                    "path": "<Keyboard>/leftShift",
+                    "id": "4e9b98e0-5003-482a-98fa-cd73d1c56e87",
+                    "path": "<Mouse>/rightButton",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "Dash",
                     "isComposite": false,
                     "isPartOfComposite": false
