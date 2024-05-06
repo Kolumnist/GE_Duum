@@ -142,13 +142,13 @@ public class CharacterControl : MonoBehaviour
 		if (!context.started || isGettingKnockedBack) return;
 		if (!IsGrounded() && jumps <= 0) return;
 
-		if (jumps == maxJumps) StartCoroutine(WaitForLanding());
 		jumps--;
 
 		DoJump();
 	}
 	public void DoJump()
 	{
+		if (jumps == maxJumps-1) StartCoroutine(WaitForLanding());
 		if (velocity < 0 || velocity > (jumpForce / 2)) velocity = 0;
 		velocity += jumpForce;
 	}
@@ -185,7 +185,15 @@ public class CharacterControl : MonoBehaviour
 	{
 		isGettingKnockedBack = true;
 		velocity += knockbackStrength;
+		if (jumps == maxJumps) StartCoroutine(WaitForLanding());
+		if (jumps ==2 ) jumps--;
 		StartCoroutine(WaitForKnockbackToEnd(knockbackDuration));
+	}
+
+	public void Shoot(InputAction.CallbackContext context)
+	{
+		Instantiate(bulletPrefab, gunTip, Quaternion.identity);
+
 	}
 }
 

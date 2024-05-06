@@ -38,7 +38,7 @@ public class GrapplingHook : MonoBehaviour
 			Vector3 lowestPoint = new(transform.position.x, transform.position.y, transform.position.z);
 			float grapplePointRelativeYPos = grapplePoint.y - lowestPoint.y;
 			float highestPointOnArc = grapplePointRelativeYPos + overshootYAxis;
-			if (grapplePointRelativeYPos < 0) highestPointOnArc = 0.01f;
+			if (grapplePointRelativeYPos < 0) highestPointOnArc = 0.5f;
 
 			GetComponentInParent<CharacterControl>().PullToPosition(grapplePoint, grappleForce, highestPointOnArc);
 		}
