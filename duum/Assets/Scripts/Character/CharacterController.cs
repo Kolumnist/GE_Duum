@@ -1,22 +1,26 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Net;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.ProBuilder.MeshOperations;
+using Cursor = UnityEngine.Cursor;
 
 [RequireComponent(typeof(CharacterController))]
 public class CharacterControl : MonoBehaviour
 {
 	[SerializeField]
 	private Camera cam;
+
 	[SerializeField]
 	private Transform gunTip;
 
 	[SerializeField]
+	private GameObject bulletPrefab;
+
+	[SerializeField]
 	private Movement movement;
+
+	[SerializeField]
+	private Transform spawnPoint;
 
 	private CharacterController characterController;
 	private bool IsGrounded() => characterController.isGrounded;
@@ -28,6 +32,9 @@ public class CharacterControl : MonoBehaviour
 	private bool isGettingKnockedBack = false;
 
 	// Character stats
+	public float maxHp;
+	private float currentHp = 0f;
+
 	public float jumpForce;
 
 	public float mouseSensitivity = 2f;
@@ -37,6 +44,7 @@ public class CharacterControl : MonoBehaviour
 	public float maxJumps = 2f;
 
 	//
+
 	[SerializeField]
 	private float gravityMultiplier;
 	private readonly float gravity = 9.81f;
@@ -47,6 +55,11 @@ public class CharacterControl : MonoBehaviour
 		characterController = GetComponent<CharacterController>();
 		Cursor.lockState = CursorLockMode.Locked;
 		Cursor.visible = false;
+	}
+
+	private void Start()
+	{
+		currentHp = maxHp;
 	}
 
 	// Update is called once per frame
@@ -89,7 +102,6 @@ public class CharacterControl : MonoBehaviour
 			velocity = 0;
 			currentMovement.z *= movement.dashMultiplier / movement.currentSpeed;
 		}
-		Debug.Log(currentMovement);
 		characterController.Move(currentMovement * Time.deltaTime);
 	}
 
@@ -190,10 +202,40 @@ public class CharacterControl : MonoBehaviour
 		StartCoroutine(WaitForKnockbackToEnd(knockbackDuration));
 	}
 
+	private IEnumerator Die()
+	{
+		yield return new WaitForEndOfFrame();
+
+		transform.position = spawnPoint.position;
+		currentHp = maxHp;
+	}
+
+	public void ApplyDamage(float damage)
+	{
+		currentHp -= damage;
+
+		if (currentHp <= 0)
+		{
+			Debug.Log("You Die");
+			StartCoroutine(Die());
+		}
+	}
+
+	private IEnumerator DeleteBullet(GameObject bullet)
+	{
+		yield return new WaitForSecondsRealtime(6);
+		if (bullet != null)
+		{
+			Destroy(bullet);
+		}
+	}
+
 	public void Shoot(InputAction.CallbackContext context)
 	{
-		Instantiate(bulletPrefab, gunTip, Quaternion.identity);
+		if (!context.started) return;
 
+		GameObject bullet = Instantiate(bulletPrefab, gunTip.position, Quaternion.Euler(gunTip.rotation.x - 45, gunTip.rotation.y, gunTip.rotation.z - 45));
+		StartCoroutine(DeleteBullet(bullet));
 	}
 }
 
