@@ -29,22 +29,9 @@ public class CharacterInputHandler : MonoBehaviour
 	public static Vector2 MoveInput { get; private set; }
     public static Vector2 LookInput { get; private set; }
 
-	public static CharacterInputHandler Instance { get; private set; }
-
-
     // Start is called before the first frame update
     void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-
         InputActionMap inputs = characterControls.FindActionMap(actionMapName);
 		moveAction = inputs.FindAction(moveName);
         lookAction = inputs.FindAction(lookName);

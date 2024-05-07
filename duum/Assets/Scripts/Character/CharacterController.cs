@@ -1,11 +1,12 @@
 using System;
 using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Cursor = UnityEngine.Cursor;
 
 [RequireComponent(typeof(CharacterController))]
-public class CharacterControl : MonoBehaviour
+public class CharacterControl : NetworkBehaviour
 {
 	[SerializeField]
 	private Camera cam;
@@ -26,7 +27,6 @@ public class CharacterControl : MonoBehaviour
 	private Transform spawnPoint;
 
 	private CharacterController characterController;
-	private bool IsGrounded() => characterController.isGrounded;
 
 	private Vector3 currentMovement = Vector3.zero;
 	private float velocity = 0f;
@@ -59,6 +59,7 @@ public class CharacterControl : MonoBehaviour
 	// Start is called before the first frame update
 	private void Awake()
 	{
+		if (!IsOwner) return;
 		characterController = GetComponent<CharacterController>();
 		Cursor.lockState = CursorLockMode.Locked;
 		Cursor.visible = false;
@@ -66,12 +67,17 @@ public class CharacterControl : MonoBehaviour
 
 	private void Start()
 	{
+		if (!IsOwner) return;
+		transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
 		currentHp = maxHp;
 	}
 
 	// Update is called once per frame
 	private void Update()
 	{
+		if (!IsOwner) return;
+		if(characterController == null) characterController = GetComponent<CharacterController>();
+
 		HandleRotation();
 		if (!GetComponent<WallJump>().holdsOntoWall)
 		{
@@ -128,7 +134,7 @@ public class CharacterControl : MonoBehaviour
 
 	private void ApplyGravity()
 	{
-		if (IsGrounded() && velocity < 0.0f) velocity = -0.5f; 
+		if (characterController.isGrounded && velocity < 0.0f) velocity = -0.5f;
 		else velocity -= gravity * gravityMultiplier * Time.deltaTime;
 
 		currentMovement.y = velocity;
@@ -154,16 +160,17 @@ public class CharacterControl : MonoBehaviour
 
 	private IEnumerator WaitForLanding()
 	{
-		yield return new WaitUntil(() => !IsGrounded());
-		yield return new WaitUntil(IsGrounded);
+		yield return new WaitUntil(() => !characterController.isGrounded);
+		yield return new WaitUntil(() => characterController.isGrounded);
 
 		jumps = 2;
 	}
 	public void Jump(InputAction.CallbackContext context)
 	{
+		if (!IsOwner) return;
 		if (GetComponent<WallJump>().holdsOntoWall) jumps = 1;
 		if (!context.started || isGettingKnockedBack) return;
-		if (!IsGrounded() && jumps <= 0) return;
+		if (!characterController.isGrounded && jumps <= 0) return;
 
 		jumps--;
 
@@ -171,6 +178,7 @@ public class CharacterControl : MonoBehaviour
 	}
 	public void DoJump()
 	{
+		if (!IsOwner) return;
 		if (jumps == maxJumps-1) StartCoroutine(WaitForLanding());
 		if (velocity < 0 || velocity > (jumpForce / 2)) velocity = 0;
 		velocity += jumpForce / hinder;
@@ -178,6 +186,7 @@ public class CharacterControl : MonoBehaviour
 
 	public void Sprint(InputAction.CallbackContext context)
 	{
+		if (!IsOwner) return;
 		movement.isSprinting = context.started || context.performed;
 	}
 
@@ -191,6 +200,7 @@ public class CharacterControl : MonoBehaviour
 	}
 	public void Dash(InputAction.CallbackContext context)
 	{
+		if (!IsOwner) return;
 		if (!context.started) return;
 		if (dashCooldownLeft > 0) return;
 
@@ -245,6 +255,7 @@ public class CharacterControl : MonoBehaviour
 
 	public void Shoot(InputAction.CallbackContext context)
 	{
+		if (!IsOwner) return;
 		if (!context.started) return;
 
 		GameObject bullet = Instantiate(bulletPrefab, gunTip.position, gunTip.rotation);
@@ -265,6 +276,7 @@ public class CharacterControl : MonoBehaviour
 
 	public void Grenade(InputAction.CallbackContext context)
 	{
+		if (!IsOwner) return;
 		if (!context.started || grenadeCooldown > 0) return;
 
 		GameObject bomb = Instantiate(bombPrefab, gunTip.position, gunTip.rotation);

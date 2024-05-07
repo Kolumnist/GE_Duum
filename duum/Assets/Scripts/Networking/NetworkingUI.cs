@@ -8,11 +8,13 @@ public class NetworkingUI : MonoBehaviour
 	public void StartHost()
 	{
 		NetworkManager.Singleton.StartHost();
+		gameObject.SetActive(false);
 	}
 
 	public void StartClient()
 	{
 		NetworkManager.Singleton.StartClient();
+		gameObject.SetActive(false);
 	}
 
 }
