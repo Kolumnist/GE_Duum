@@ -252,7 +252,6 @@ public class CharacterControl : MonoBehaviour
 		StartCoroutine(DeleteBullet(bullet));
 	}
 
-
 	private IEnumerator ResetHinder()
 	{
 		yield return new WaitForSecondsRealtime(2);

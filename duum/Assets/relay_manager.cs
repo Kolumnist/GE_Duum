@@ -16,6 +16,9 @@ public class relay_manager : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI joinCodeText;
     [SerializeField] private TMP_InputField joinCodeInputField;
+
+    public string joinCode;
+    
     // Start is called before the first frame update
     async void Start()
     {
@@ -26,8 +29,7 @@ public class relay_manager : MonoBehaviour
 
     public async void StartRelay()
     {
-        string joinCode = await StartHostingWithRelay();
-        joinCodeText.text = joinCode;
+        await StartHostingWithRelay();
     }
 
     public async void JoinRelay()
@@ -35,16 +37,22 @@ public class relay_manager : MonoBehaviour
         await StartClientWithRelay(joinCodeInputField.text);
     }
 
-    private async Task<string> StartHostingWithRelay(int maxConnections = 3)
+    private async Task StartHostingWithRelay(int maxConnections = 3)
     {
+        try
+        {
+			Allocation allocation = await RelayService.Instance.CreateAllocationAsync(maxConnections);
 
-        Allocation allocation = await RelayService.Instance.CreateAllocationAsync(maxConnections);
+			NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "dtls"));
 
-        NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "dtls"));
-
-        string joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-
-        return NetworkManager.Singleton.StartHost() ? joinCode : null;
+			joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+			joinCodeText.text = joinCode;
+		}
+        catch (RelayServiceException e)
+        {
+            Debug.Log(e);
+        }
+       
     }
     
     private async Task<bool> StartClientWithRelay(string lobbyCode)
