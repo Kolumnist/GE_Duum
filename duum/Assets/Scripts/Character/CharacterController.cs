@@ -65,9 +65,20 @@ public class CharacterControl : NetworkBehaviour
 		Cursor.visible = false;
 	}
 
+	private void OnNetworkInstantiate()
+	{
+		if (!IsOwner) return;
+		characterController = GetComponent<CharacterController>();
+		Cursor.lockState = CursorLockMode.Locked;
+		Cursor.visible = false;
+	}
+
 	private void Start()
 	{
 		if (!IsOwner) return;
+		characterController = GetComponent<CharacterController>();
+		Cursor.lockState = CursorLockMode.Locked;
+		Cursor.visible = false;
 		transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
 		currentHp = maxHp;
 	}
