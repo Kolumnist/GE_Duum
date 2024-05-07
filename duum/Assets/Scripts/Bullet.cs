@@ -6,6 +6,12 @@ public class Bullet : MonoBehaviour
 {
     public float damage;
     public float speed;
+	public Vector3 velocity;
+
+	private void Update()
+	{
+		transform.position += velocity * speed * Time.deltaTime;
+	}
 
 	private void OnTriggerEnter(Collider other)
 	{

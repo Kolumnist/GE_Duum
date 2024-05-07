@@ -12021,7 +12021,19 @@ MonoBehaviour:
     m_ActionId: a5016deb-750a-4f4e-961f-7d809bc14764
     m_ActionName: Player/Grappling Hook[/Mouse/rightButton]
   - m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 453757296}
+        m_TargetAssemblyTypeName: CharacterControl, Assembly-CSharp
+        m_MethodName: Grenade
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
     m_ActionId: 786cf6b8-3ade-410c-a988-c52c6c3da06b
     m_ActionName: Player/Grenade[/Keyboard/f]
   - m_PersistentCalls:
@@ -20228,6 +20240,7 @@ MonoBehaviour:
   cam: {fileID: 736827955}
   gunTip: {fileID: 910253084}
   bulletPrefab: {fileID: 798185527060352991, guid: 4a1208f174adec94e8035ca5d263471c, type: 3}
+  bombPrefab: {fileID: 8638314484137805672, guid: 48b7244adad5ced4cb2977369ab7b3c3, type: 3}
   movement:
     speed: 6
     wallClimbSpeed: 1
@@ -20245,6 +20258,8 @@ MonoBehaviour:
   mouseSensitivity: 1
   lookUpDownRange: 60
   maxJumps: 2
+  throwForce: 10
+  grenadeCooldown: 0
   gravityMultiplier: 2
 --- !u!143 &453757297
 CharacterController:
@@ -24687,7 +24702,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a95fe6884922a874c95545cf314d58c5, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.529
+      value: 0.53
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a95fe6884922a874c95545cf314d58c5, type: 3}
       propertyPath: m_LocalPosition.y
@@ -24695,7 +24710,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a95fe6884922a874c95545cf314d58c5, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.998
+      value: -1.4
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a95fe6884922a874c95545cf314d58c5, type: 3}
       propertyPath: m_LocalRotation.w
@@ -49620,13 +49635,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 910253083}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.1, z: 0.5}
+  m_LocalRotation: {x: -0.5, y: 0.5, z: 0.5, w: 0.5}
+  m_LocalPosition: {x: -0, y: 1.75, z: 1.989}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 908262282}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: -90, y: 90, z: 0}
 --- !u!1 &914718668
 GameObject:
   m_ObjectHideFlags: 0
@@ -79635,7 +79650,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 30, y: -15}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1883665480

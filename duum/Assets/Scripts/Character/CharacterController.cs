@@ -17,6 +17,9 @@ public class CharacterControl : MonoBehaviour
 	private GameObject bulletPrefab;
 
 	[SerializeField]
+	private GameObject bombPrefab;
+
+	[SerializeField]
 	private Movement movement;
 
 	[SerializeField]
@@ -43,11 +46,15 @@ public class CharacterControl : MonoBehaviour
 	private float jumps = 2f;
 	public float maxJumps = 2f;
 
+	public float throwForce;
+	public float grenadeCooldown;
 	//
 
 	[SerializeField]
 	private float gravityMultiplier;
 	private readonly float gravity = 9.81f;
+
+	private int hinder = 1;
 
 	// Start is called before the first frame update
 	private void Awake()
@@ -76,6 +83,10 @@ public class CharacterControl : MonoBehaviour
 		{
 			dashCooldownLeft -= Time.deltaTime;
 		}
+		if (grenadeCooldown > 0)
+		{
+			grenadeCooldown -= Time.deltaTime;
+		}
 	}
 
 	private void HandleMove()
@@ -102,7 +113,7 @@ public class CharacterControl : MonoBehaviour
 			velocity = 0;
 			currentMovement.z *= movement.dashMultiplier / movement.currentSpeed;
 		}
-		characterController.Move(currentMovement * Time.deltaTime);
+		characterController.Move((currentMovement / hinder) * Time.deltaTime);
 	}
 
 	private void HandleRotation()
@@ -162,7 +173,7 @@ public class CharacterControl : MonoBehaviour
 	{
 		if (jumps == maxJumps-1) StartCoroutine(WaitForLanding());
 		if (velocity < 0 || velocity > (jumpForce / 2)) velocity = 0;
-		velocity += jumpForce;
+		velocity += jumpForce / hinder;
 	}
 
 	public void Sprint(InputAction.CallbackContext context)
@@ -204,10 +215,12 @@ public class CharacterControl : MonoBehaviour
 
 	private IEnumerator Die()
 	{
+		characterController.enabled = false;
 		yield return new WaitForEndOfFrame();
 
 		transform.position = spawnPoint.position;
 		currentHp = maxHp;
+		characterController.enabled = true;
 	}
 
 	public void ApplyDamage(float damage)
@@ -234,8 +247,31 @@ public class CharacterControl : MonoBehaviour
 	{
 		if (!context.started) return;
 
-		GameObject bullet = Instantiate(bulletPrefab, gunTip.position, Quaternion.Euler(gunTip.rotation.x - 45, gunTip.rotation.y, gunTip.rotation.z - 45));
+		GameObject bullet = Instantiate(bulletPrefab, gunTip.position, gunTip.rotation);
+		bullet.GetComponent<Bullet>().velocity = new Vector3(cam.transform.forward.x * 1.2f, cam.transform.forward.y, cam.transform.forward.z * 1.2f);
 		StartCoroutine(DeleteBullet(bullet));
+	}
+
+
+	private IEnumerator ResetHinder()
+	{
+		yield return new WaitForSecondsRealtime(2);
+		hinder = 1;
+	}
+	public void SetHinder()
+	{
+		hinder = 2;
+		StartCoroutine(ResetHinder());
+	}
+
+	public void Grenade(InputAction.CallbackContext context)
+	{
+		if (!context.started || grenadeCooldown > 0) return;
+
+		GameObject bomb = Instantiate(bombPrefab, gunTip.position, gunTip.rotation);
+		bomb.GetComponent<Rigidbody>().AddForce(cam.transform.forward * throwForce, ForceMode.Impulse);
+
+		grenadeCooldown = 2;
 	}
 }
 

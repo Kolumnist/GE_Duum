@@ -1,5 +1,4 @@
 using System;
-using Unity.Netcode;
 using UnityEngine;
 using UnityStandardAssets.CrossPlatformInput;
 using UnityStandardAssets.Utility;
@@ -10,7 +9,7 @@ namespace UnityStandardAssets.Characters.FirstPerson
 {
     [RequireComponent(typeof (CharacterController))]
     [RequireComponent(typeof (AudioSource))]
-    public class FirstPersonController : NetworkBehaviour
+    public class FirstPersonController : MonoBehaviour
     {
         [SerializeField] private bool m_IsWalking;
         [SerializeField] private float m_WalkSpeed;
@@ -30,10 +29,6 @@ namespace UnityStandardAssets.Characters.FirstPerson
         [SerializeField] private AudioClip m_JumpSound;           // the sound played when character leaves the ground.
         [SerializeField] private AudioClip m_LandSound;           // the sound played when character touches back on ground.
 
-        [SerializeField] private GameObject healthpoint;
-        private NetworkVariable<int> health = 
-            new NetworkVariable<int>(2, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
         private Camera m_Camera;
         private bool m_Jump;
         private float m_YRotation;
@@ -51,88 +46,42 @@ namespace UnityStandardAssets.Characters.FirstPerson
         // Use this for initialization
         private void Start()
         {
-			if (IsOwner)
-            {
-				m_CharacterController = GetComponent<CharacterController>();
-				m_Camera = Camera.main;
-				m_OriginalCameraPosition = m_Camera.transform.localPosition;
-				m_FovKick.Setup(m_Camera);
-				m_HeadBob.Setup(m_Camera, m_StepInterval);
-				m_StepCycle = 0f;
-				m_NextStep = m_StepCycle / 2f;
-				m_Jumping = false;
-				m_AudioSource = GetComponent<AudioSource>();
-				m_MouseLook.Init(transform, m_Camera.transform);
-			}
+            m_CharacterController = GetComponent<CharacterController>();
+            m_Camera = Camera.main;
+            m_OriginalCameraPosition = m_Camera.transform.localPosition;
+            m_FovKick.Setup(m_Camera);
+            m_HeadBob.Setup(m_Camera, m_StepInterval);
+            m_StepCycle = 0f;
+            m_NextStep = m_StepCycle/2f;
+            m_Jumping = false;
+            m_AudioSource = GetComponent<AudioSource>();
+			m_MouseLook.Init(transform , m_Camera.transform);
         }
 
-		public override void OnNetworkSpawn()
-        {
-            health.OnValueChanged += (previous, current) =>
-            {
-				healthpoint.transform.localScale = new Vector3(health.Value * 0.25f, health.Value * 0.25f, health.Value * 0.25f);
-			};
-        }
-
-        [SerializeField]
-        private GameObject bulletPrefab;
-
-        [ServerRpc]
-        private void SpawnBulletServerRPC()
-        {
-            GameObject bullet = Instantiate(bulletPrefab, transform.position, Quaternion.identity);
-            bullet.GetComponent<NetworkObject>().Spawn(true);
-        }
-
-        [ClientRpc]
-        private void ResetPositionClientRPC(ClientRpcParams clientRpcParams)
-        {
-            transform.localScale = Vector3.zero;
-        }
 
         // Update is called once per frame
         private void Update()
         {
-            if (IsServer && Input.GetKeyDown(KeyCode.R))
+            RotateView();
+            // the jump state needs to read here to make sure it is not missed
+            if (!m_Jump)
             {
-                ResetPositionClientRPC(new ClientRpcParams
-                {
-                    Send = new ClientRpcSendParams
-                    {
-                        TargetClientIds = new ulong[] { 1 }
-                    }
-                });
+                m_Jump = CrossPlatformInputManager.GetButtonDown("Jump");
             }
 
-            if(IsOwner)
+            if (!m_PreviouslyGrounded && m_CharacterController.isGrounded)
             {
-				RotateView();
-				// the jump state needs to read here to make sure it is not missed
-				if (!m_Jump)
-				{
-					m_Jump = CrossPlatformInputManager.GetButtonDown("Jump");
-				}
+                StartCoroutine(m_JumpBob.DoBobCycle());
+                PlayLandingSound();
+                m_MoveDir.y = 0f;
+                m_Jumping = false;
+            }
+            if (!m_CharacterController.isGrounded && !m_Jumping && m_PreviouslyGrounded)
+            {
+                m_MoveDir.y = 0f;
+            }
 
-				if (!m_PreviouslyGrounded && m_CharacterController.isGrounded)
-				{
-					StartCoroutine(m_JumpBob.DoBobCycle());
-					PlayLandingSound();
-					m_MoveDir.y = 0f;
-					m_Jumping = false;
-				}
-				if (!m_CharacterController.isGrounded && !m_Jumping && m_PreviouslyGrounded)
-				{
-					m_MoveDir.y = 0f;
-				}
-
-                if(Input.anyKeyDown)
-                {
-					//health.Value -= 1;
-                    //SpawnBulletServerRPC();
-				}
-
-				m_PreviouslyGrounded = m_CharacterController.isGrounded;
-			}
+            m_PreviouslyGrounded = m_CharacterController.isGrounded;
         }
 
 
