@@ -1,8 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 
-public class Bomb : MonoBehaviour
+public class Bomb : NetworkBehaviour
 {
 	[SerializeField]
 	private GameObject explosionParticlesPrefab;
@@ -24,6 +25,7 @@ public class Bomb : MonoBehaviour
 		yield return new WaitForSecondsRealtime(tillExplode);
 		GameObject effect = Instantiate(explosionParticlesPrefab, transform.position, Quaternion.identity);
 
+		
 		var colliders = Physics.OverlapSphere(transform.position, 10, playerMask);
 		foreach (var collider in colliders)
 		{
@@ -38,9 +40,8 @@ public class Bomb : MonoBehaviour
 
 		GetComponent<Renderer>().enabled = false;
 		GetComponent<Collider>().enabled = false;
-
+		Destroy(effect, 13);
 		Destroy(gameObject, 10);
-		Destroy(effect, 18);
 	}
 
 }

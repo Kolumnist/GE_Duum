@@ -1,9 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class WallJump : MonoBehaviour
+public class WallJump : NetworkBehaviour
 {
 	[SerializeField]
 	private LayerMask whatIsWall;
@@ -23,11 +24,13 @@ public class WallJump : MonoBehaviour
 	// Start is called before the first frame update
 	void Start()
 	{
+		if (!IsOwner) return;
 		characterController = GetComponent<CharacterController>();
 	}
 
 	private void FixedUpdate()
 	{
+		if (!IsOwner) return;
 		if (holdsOntoWall)
 		{
 			var normalized = CharacterInputHandler.MoveInput.normalized;
@@ -46,6 +49,7 @@ public class WallJump : MonoBehaviour
 	// Update is called once per frame
 	void Update()
 	{
+		if (!IsOwner) return;
 		CheckForWall();
 	}
 
@@ -59,6 +63,8 @@ public class WallJump : MonoBehaviour
 
 	public void Jump(InputAction.CallbackContext context)
 	{
+		if (!IsOwner) return;
+
 		if (context.performed && 
 			(wallLeft || wallRight || wallForward || wallBackward) && 
 			!characterController.isGrounded)

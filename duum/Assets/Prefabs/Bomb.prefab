@@ -150,5 +150,5 @@ MonoBehaviour:
   playerMask:
     serializedVersion: 2
     m_Bits: 8
-  tillExplode: 4
+  tillExplode: 3
   damage: 10

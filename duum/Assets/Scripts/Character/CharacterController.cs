@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using Unity.Netcode;
+using Unity.Services.Authentication;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Cursor = UnityEngine.Cursor;
@@ -10,9 +11,6 @@ public class CharacterControl : NetworkBehaviour
 {
 	[SerializeField]
 	private Camera cam;
-
-	[SerializeField]
-	private Transform gunTip;
 
 	[SerializeField]
 	private GameObject bulletPrefab;
@@ -36,7 +34,7 @@ public class CharacterControl : NetworkBehaviour
 
 	// Character stats
 	public float maxHp;
-	private float currentHp = 0f;
+	private float currentHp = 20f;
 
 	public float jumpForce;
 
@@ -55,23 +53,10 @@ public class CharacterControl : NetworkBehaviour
 	private readonly float gravity = 9.81f;
 
 	private int hinder = 1;
+	private bool isDying = false;
 
-	// Start is called before the first frame update
-	private void Awake()
-	{
-		if (!IsOwner) return;
-		characterController = GetComponent<CharacterController>();
-		Cursor.lockState = CursorLockMode.Locked;
-		Cursor.visible = false;
-	}
-
-	private void OnNetworkInstantiate()
-	{
-		if (!IsOwner) return;
-		characterController = GetComponent<CharacterController>();
-		Cursor.lockState = CursorLockMode.Locked;
-		Cursor.visible = false;
-	}
+	[SerializeField]
+	private Transform gunTip;
 
 	private void Start()
 	{
@@ -83,10 +68,18 @@ public class CharacterControl : NetworkBehaviour
 		currentHp = maxHp;
 	}
 
+	public override void OnNetworkSpawn()
+	{
+		if (!IsOwner) {
+			cam.enabled = false;
+		}
+	}
+
 	// Update is called once per frame
 	private void Update()
 	{
 		if (!IsOwner) return;
+
 		if(characterController == null) characterController = GetComponent<CharacterController>();
 
 		HandleRotation();
@@ -103,6 +96,14 @@ public class CharacterControl : NetworkBehaviour
 		if (grenadeCooldown > 0)
 		{
 			grenadeCooldown -= Time.deltaTime;
+		}
+	}
+
+	private void LateUpdate()
+	{
+		if (isDying)
+		{
+			Die();
 		}
 	}
 
@@ -153,6 +154,7 @@ public class CharacterControl : NetworkBehaviour
 
 	public void PullToPosition(Vector3 targetPosition, float grappleForce, float trajectoryHeight)
 	{
+		if (!IsOwner) return;
 		Vector3 startPoint = transform.position;
 		Vector3 endPoint = targetPosition;
 
@@ -227,6 +229,7 @@ public class CharacterControl : NetworkBehaviour
 	}
 	public void Knockback(float knockbackStrength, float knockbackDuration)
 	{
+		if (!IsOwner) return;
 		isGettingKnockedBack = true;
 		velocity += knockbackStrength;
 		if (jumps == maxJumps) StartCoroutine(WaitForLanding());
@@ -234,24 +237,42 @@ public class CharacterControl : NetworkBehaviour
 		StartCoroutine(WaitForKnockbackToEnd(knockbackDuration));
 	}
 
-	private IEnumerator Die()
+	private void NotDying()
+	{
+		isDying = false;
+	}
+
+	private void Die()
 	{
 		characterController.enabled = false;
-		yield return new WaitForEndOfFrame();
-
-		transform.position = spawnPoint.position;
+		gameObject.transform.position = new Vector3(spawnPoint.position.x, spawnPoint.position.y, spawnPoint.position.z);
+		gameObject.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+		gameObject.transform.SetLocalPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+		NetworkObject.TrySetParent(gameObject, spawnPoint.gameObject);
+		
+		if (gameObject.transform.position != spawnPoint.position)
+		{
+			Debug.Log("position not reset...");
+			return;
+		}
 		currentHp = maxHp;
 		characterController.enabled = true;
+		gameObject.transform.position = spawnPoint.position;
+		gameObject.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+		gameObject.transform.SetLocalPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
 	}
 
 	public void ApplyDamage(float damage)
 	{
-		currentHp -= damage;
-
+		Debug.Log(OwnerClientId + " Owner: " + this.gameObject);
+		if (!IsOwner) return;
+        currentHp -= damage;
 		if (currentHp <= 0)
 		{
 			Debug.Log("You Die");
-			StartCoroutine(Die());
+			isDying = true;
+			Die();
+			Invoke(nameof(NotDying), 2);
 		}
 	}
 
@@ -281,6 +302,8 @@ public class CharacterControl : NetworkBehaviour
 	}
 	public void SetHinder()
 	{
+		if (!IsOwner) return;
+
 		hinder = 2;
 		StartCoroutine(ResetHinder());
 	}
@@ -294,6 +317,13 @@ public class CharacterControl : NetworkBehaviour
 		bomb.GetComponent<Rigidbody>().AddForce(cam.transform.forward * throwForce, ForceMode.Impulse);
 
 		grenadeCooldown = 2;
+	}
+
+	public void Grapple(InputAction.CallbackContext context)
+	{
+		if (!IsOwner) return;
+		if (!context.started) return;
+		GetComponentInChildren<GrapplingHook>().Grapple();
 	}
 }
 

@@ -1,13 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class GrapplingHook : MonoBehaviour
+public class GrapplingHook : NetworkBehaviour
 {
-	[SerializeField]
-	private Transform cam;
 	[SerializeField]
 	private Transform gunTip;
 	[SerializeField]
@@ -15,6 +14,7 @@ public class GrapplingHook : MonoBehaviour
 	[SerializeField]
 	private LineRenderer lineRenderer;
 
+	private Transform cam;
 	private Vector3 grapplePoint = Vector3.zero;
 
 	private bool isGrappling = false;
@@ -28,6 +28,7 @@ public class GrapplingHook : MonoBehaviour
 
 	private void Start()
 	{
+		cam = transform.parent;
 		lineRenderer.enabled = false;
 	}
 
@@ -57,16 +58,15 @@ public class GrapplingHook : MonoBehaviour
 		}
 	}
 
-	public void Grapple(InputAction.CallbackContext context)
+	public void Grapple()
 	{
-		if (!context.started) return;
 		if (isGrappling || grapplingCdTimer > 0) return;
 
 
 		if (Physics.Raycast(gunTip.position, cam.transform.forward, out RaycastHit hit, grappleDistance, isGrappingHookApproved))
 		{
 			grapplePoint = hit.point;
-			isGrappling = context.started;
+			isGrappling = true;
 		}
 		else
 		{
