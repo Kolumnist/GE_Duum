@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using Unity.Netcode;
-using Unity.Services.Authentication;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Cursor = UnityEngine.Cursor;
@@ -13,16 +12,19 @@ public class CharacterControl : NetworkBehaviour
 	private Camera cam;
 
 	[SerializeField]
-	private GameObject bulletPrefab;
+	private NetworkObject bulletPrefab;
 
 	[SerializeField]
-	private GameObject bombPrefab;
+	private NetworkObject bombPrefab;
 
 	[SerializeField]
 	private Movement movement;
 
 	[SerializeField]
 	private Transform spawnPoint;
+
+	[SerializeField]
+	private Transform gunTip;
 
 	private CharacterController characterController;
 
@@ -34,7 +36,7 @@ public class CharacterControl : NetworkBehaviour
 
 	// Character stats
 	public float maxHp;
-	private float currentHp = 20f;
+	private readonly NetworkVariable<float> currentHp = new(20f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
 	public float jumpForce;
 
@@ -55,24 +57,32 @@ public class CharacterControl : NetworkBehaviour
 	private int hinder = 1;
 	private bool isDying = false;
 
-	[SerializeField]
-	private Transform gunTip;
-
-	private void Start()
+	/*private void Start()
 	{
 		if (!IsOwner) return;
 		characterController = GetComponent<CharacterController>();
 		Cursor.lockState = CursorLockMode.Locked;
 		Cursor.visible = false;
 		transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
-		currentHp = maxHp;
-	}
+		currentHp.Value = maxHp;
+	}*/
 
 	public override void OnNetworkSpawn()
 	{
-		if (!IsOwner) {
+		if (!IsOwner) 
+		{
 			cam.enabled = false;
+			transform.name = "Player " + OwnerClientId;
+			GetComponent<PlayerInput>().enabled = false;
+			return;
 		}
+
+		transform.name = "Player " + OwnerClientId;
+		characterController = GetComponent<CharacterController>();
+		Cursor.lockState = CursorLockMode.Locked;
+		Cursor.visible = false;
+		transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+		currentHp.Value = maxHp;
 	}
 
 	// Update is called once per frame
@@ -180,7 +190,6 @@ public class CharacterControl : NetworkBehaviour
 	}
 	public void Jump(InputAction.CallbackContext context)
 	{
-		if (!IsOwner) return;
 		if (GetComponent<WallJump>().holdsOntoWall) jumps = 1;
 		if (!context.started || isGettingKnockedBack) return;
 		if (!characterController.isGrounded && jumps <= 0) return;
@@ -199,7 +208,6 @@ public class CharacterControl : NetworkBehaviour
 
 	public void Sprint(InputAction.CallbackContext context)
 	{
-		if (!IsOwner) return;
 		movement.isSprinting = context.started || context.performed;
 	}
 
@@ -213,7 +221,6 @@ public class CharacterControl : NetworkBehaviour
 	}
 	public void Dash(InputAction.CallbackContext context)
 	{
-		if (!IsOwner) return;
 		if (!context.started) return;
 		if (dashCooldownLeft > 0) return;
 
@@ -244,18 +251,21 @@ public class CharacterControl : NetworkBehaviour
 
 	private void Die()
 	{
+		if (characterController == null)
+		{
+			characterController = gameObject.GetComponent<CharacterController>();
+		}
 		characterController.enabled = false;
 		gameObject.transform.position = new Vector3(spawnPoint.position.x, spawnPoint.position.y, spawnPoint.position.z);
 		gameObject.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
 		gameObject.transform.SetLocalPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
-		NetworkObject.TrySetParent(gameObject, spawnPoint.gameObject);
 		
 		if (gameObject.transform.position != spawnPoint.position)
 		{
 			Debug.Log("position not reset...");
 			return;
 		}
-		currentHp = maxHp;
+		currentHp.Value = maxHp;
 		characterController.enabled = true;
 		gameObject.transform.position = spawnPoint.position;
 		gameObject.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
@@ -264,10 +274,11 @@ public class CharacterControl : NetworkBehaviour
 
 	public void ApplyDamage(float damage)
 	{
-		Debug.Log(OwnerClientId + " Owner: " + this.gameObject);
 		if (!IsOwner) return;
-        currentHp -= damage;
-		if (currentHp <= 0)
+		Debug.Log("Hp: " + currentHp.Value);
+		Debug.Log("Owner of this method call: " + gameObject.name);
+        currentHp.Value -= damage;
+		if (currentHp.Value <= 0)
 		{
 			Debug.Log("You Die");
 			isDying = true;
@@ -276,23 +287,18 @@ public class CharacterControl : NetworkBehaviour
 		}
 	}
 
-	private IEnumerator DeleteBullet(GameObject bullet)
-	{
-		yield return new WaitForSecondsRealtime(6);
-		if (bullet != null)
-		{
-			Destroy(bullet);
-		}
-	}
-
 	public void Shoot(InputAction.CallbackContext context)
 	{
-		if (!IsOwner) return;
 		if (!context.started) return;
+		SpawnBulletServerRpc(new Vector3(cam.transform.forward.x * 1.2f, cam.transform.forward.y, cam.transform.forward.z * 1.2f));
+	}
 
-		GameObject bullet = Instantiate(bulletPrefab, gunTip.position, gunTip.rotation);
-		bullet.GetComponent<Bullet>().velocity = new Vector3(cam.transform.forward.x * 1.2f, cam.transform.forward.y, cam.transform.forward.z * 1.2f);
-		StartCoroutine(DeleteBullet(bullet));
+	[Rpc(SendTo.Server)]
+	private void SpawnBulletServerRpc(Vector3 velocity)
+	{
+		NetworkObject bullet = Instantiate(bulletPrefab, gunTip.position, gunTip.rotation);
+		bullet.gameObject.GetComponent<Bullet>().velocity = velocity;
+		bullet.Spawn();
 	}
 
 	private IEnumerator ResetHinder()
@@ -310,18 +316,21 @@ public class CharacterControl : NetworkBehaviour
 
 	public void Grenade(InputAction.CallbackContext context)
 	{
-		if (!IsOwner) return;
 		if (!context.started || grenadeCooldown > 0) return;
+		SpawnGrenadeServerRpc(cam.transform.forward * throwForce);
+		grenadeCooldown = 1.5f;
+	}
 
-		GameObject bomb = Instantiate(bombPrefab, gunTip.position, gunTip.rotation);
-		bomb.GetComponent<Rigidbody>().AddForce(cam.transform.forward * throwForce, ForceMode.Impulse);
-
-		grenadeCooldown = 2;
+	[Rpc(SendTo.Server)]
+	private void SpawnGrenadeServerRpc(Vector3 throwVector)
+	{
+		NetworkObject bomb = Instantiate(bombPrefab, gunTip.position, gunTip.rotation);
+		bomb.gameObject.GetComponent<Rigidbody>().AddForce(throwVector, ForceMode.Impulse);
+		bomb.Spawn();
 	}
 
 	public void Grapple(InputAction.CallbackContext context)
 	{
-		if (!IsOwner) return;
 		if (!context.started) return;
 		GetComponentInChildren<GrapplingHook>().Grapple();
 	}

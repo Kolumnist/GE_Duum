@@ -12,8 +12,9 @@ public class Bomb : NetworkBehaviour
 	private LayerMask playerMask;
 
 	public float tillExplode;
-
 	public float damage;
+
+	private GameObject effect;
 
 	void Start()
     {
@@ -23,7 +24,7 @@ public class Bomb : NetworkBehaviour
     private IEnumerator Explode()
     {
 		yield return new WaitForSecondsRealtime(tillExplode);
-		GameObject effect = Instantiate(explosionParticlesPrefab, transform.position, Quaternion.identity);
+		effect = Instantiate(explosionParticlesPrefab, transform.position, Quaternion.identity);
 
 		
 		var colliders = Physics.OverlapSphere(transform.position, 10, playerMask);
@@ -33,6 +34,7 @@ public class Bomb : NetworkBehaviour
 
 			if (collider.gameObject.TryGetComponent<CharacterControl>(out var control))
 			{
+				Debug.Log("Explode on: " + collider.name);
 				control.ApplyDamage(damage);
 				control.SetHinder();
 			}
@@ -40,7 +42,13 @@ public class Bomb : NetworkBehaviour
 
 		GetComponent<Renderer>().enabled = false;
 		GetComponent<Collider>().enabled = false;
-		Destroy(effect, 13);
+		DestroyObjectServerRpc();
+	}
+
+	[Rpc(SendTo.Server)]
+	private void DestroyObjectServerRpc()
+	{
+		Destroy(effect, 9);
 		Destroy(gameObject, 10);
 	}
 
